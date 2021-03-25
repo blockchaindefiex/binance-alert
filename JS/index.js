@@ -100,8 +100,8 @@ const klineEHandler = ({ symbol, ts, open, high, low, close }) => {
           ? true
           : false
         : currentPrice <= a.price
-        ? true
-        : false;
+          ? true
+          : false;
     if (!flag) return;
     alerts[i].status = 'CLOSED';
     document.getElementById(
@@ -114,9 +114,8 @@ const klineEHandler = ({ symbol, ts, open, high, low, close }) => {
       klinews.unsubscribe({ symbol: a.symbol });
     }
     notify({
-      title: `${a.symbol} Price ${a.condition === 'GE' ? '>=' : '<='} ${
-        a.price
-      }`,
+      title: `${a.symbol} Price ${a.condition === 'GE' ? '>=' : '<='} ${a.price
+        }`,
       message: a.message,
     }); //notify
     chartsymbolupd();
@@ -175,8 +174,11 @@ const addAlertBtnFn = () => {
   <td id="${alert.id}status"><span class="span-alert-pending">Pending</span></td>
   <td><i id="${alert.id}delete" class="fas fa-trash-alt btn-delete"></i></td>
   <td>${message}</td>
-  <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=BINANCE:${symbol}">link</a></td>
+  <td><a target="_blank" href="https://www.binance.com/en/trade/${symbol}?layout=pro">link</a></td>
   </tr>`;
+  // https://www.binance.com/en/trade/RSRBTC?layout=pro
+  // <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=BINANCE:${symbol}">link</a></td>
+
   document.getElementById('alertsbody').insertAdjacentHTML('beforeend', markup);
   document
     .getElementById(`${alert.id}delete`)
