@@ -1,7 +1,7 @@
 const E = require('events');
 const log = console.log;
 
-const getsubs = (symbol) => symbol.toLowerCase() + '@kline_1m';
+const getsubs = (symbol) => symbol.toLowerCase() + '@kline_15m';
 
 let klinews = {
   symbols: [],
@@ -72,8 +72,13 @@ let klinews = {
     });
   },
   subscribe({ symbol }) {
+    log("subscribe: ", symbol);
+
     if (klinews.subsymbols.includes(symbol)) return;
     if (klinews.ws.readyState !== WebSocket.OPEN) return;
+
+    log("klinews.ws.readyState: ", klinews.ws.readyState, " : ", WebSocket.OPEN);
+
     klinews.subsymbols.push(symbol);
     klinews.ws.send(
       JSON.stringify({

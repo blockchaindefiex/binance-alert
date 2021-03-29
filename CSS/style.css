@@ -60,6 +60,7 @@ header h4 {
   margin-left: 10rem;
   font-size: 1rem;
   border-spacing: 0px;
+  max-height: 500px;
 }
 
 #alerts th {

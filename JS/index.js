@@ -1,6 +1,9 @@
 import klinews from './Utils/klinews.js';
 import notify from './Utils/notify.js';
 const swal = require('sweetalert');
+// const log = require('electron-log');
+const BigNumber = require('bignumber.js');
+const log = console.log;
 
 const chartsymbolupd = async (e) => {
   try {
@@ -82,17 +85,123 @@ const chartsymbolupd = async (e) => {
 };
 
 const initialize = async () => {
+  console.log("- initialize -");
+
   await klinews.downloadAllSymbols();
   klinews.startSocket();
   klinews.eventEmitter.on('PRICEUPDATES', klineEHandler);
+  addInitAlerts();
 };
+
+const getChange = ({ ts, open, high, low, close }) => {
+  return BigNumber(high / low * 100).toFixed(2);
+}
+
+function sortTable() {
+  var table, rows, switching, i, x, y, shouldSwitch;
+  table = document.getElementById("alerts");
+  switching = true;
+  /*Make a loop that will continue until
+  no switching has been done:*/
+  while (switching) {
+    //start by saying: no switching is done:
+    switching = false;
+    rows = table.rows;
+    /*Loop through all table rows (except the
+    first, which contains table headers):*/
+    for (i = 1; i < (rows.length - 1); i++) {
+      //start by saying there should be no switching:
+      shouldSwitch = false;
+      /*Get the two elements you want to compare,
+      one from current row and one from the next:*/
+      x = rows[i].getElementsByTagName("TD")[5];
+      y = rows[i + 1].getElementsByTagName("TD")[5];
+      //check if the two rows should switch place:
+      let xvalue = x.innerHTML;
+      let yvalue = y.innerHTML;
+
+      // console.log("xvalue = ", xvalue);
+      if (xvalue !== "" && yvalue !== "" && parseFloat(xvalue) < parseFloat(yvalue)) {
+        //if so, mark as a switch and break the loop:        
+        shouldSwitch = true;
+        break;
+      }
+      else if (xvalue === "" && yvalue !== "") {
+        shouldSwitch = true;
+        break;
+      }
+    }
+    if (shouldSwitch) {
+      /*If a switch has been marked, make the switch
+      and mark that a switch has been done:*/
+      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+      switching = true;
+    }
+  }
+}
 
 //Add event Listeners
 const klineEHandler = ({ symbol, ts, open, high, low, close }) => {
+
+  // //updated alert
+  // alerts.forEach(al => {
+  //   if (al.symbol !== symbol)
+  //     return;
+
+  //   al.candle = { ts, open, high, low, close };
+  // });
+
+  // //sort alerts
+  // alerts.sort((a, b) => {
+  //   if (a.candle) {
+  //     if (b.candle) {
+  //       const achange = getChange(a.candle);
+  //       const bchange = getChange(b.candle);
+  //       achange > bchange ? 1 : achange === bchange ? 0 : -1;
+  //     }
+  //     else {
+  //       return 1;
+  //     }
+  //   }
+  //   else {
+  //     if (b.candle) {
+  //       return -1;
+  //     }
+  //     else
+  //       return 0;
+  //   }
+  // });
+
+  // //clear rows
+  // var new_tbody = document.createElement('alertsbody');
+  // alerts.forEach(alert => {
+  //   const markup = `<tr id="${alert.id}">
+  //   <td>${alerts.length}</td>
+  //   <td>${symbol}</td>
+  //   <td>${condition}</td>
+  //   <td>${price}</td>
+  //   <td id="${alert.id}cp">${price}</td>
+  //   <td id="${alert.id}status"><span class="span-alert-pending">Pending</span></td>
+  //   <td><i id="${alert.id}delete" class="fas fa-trash-alt btn-delete"></i></td>
+  //   <td>${message}</td>
+  //   <td><a target="_blank" href="https://www.binance.com/en/trade/${symbol}?layout=pro">link</a></td>
+  //   </tr>`;
+  //   new_tbody.insertAdjacentHTML('beforeend', markup);
+  //   // document
+  //   //   .getElementById(`${alert.id}delete`)
+  //   //   .addEventListener('click', deleteAlertFn);
+  //   // document.getElementById(alert.id).addEventListener('click', chartsymbolupd);
+  //   // document.getElementById(alert.id).style.cursor = 'pointer';
+  // });
+  // document.getElementById('alertsbody').parentNode.replaceChild(new_tbody, document.getElementById('alertsbody'));
+
   const currentPrice = parseFloat(close);
   alerts.forEach((a, i) => {
     if (a.symbol !== symbol || a.status !== 'PENDING') return;
     document.getElementById(`${a.id}cp`).innerHTML = currentPrice;
+    const change = getChange({ ts, open, high, low, close });
+    document.getElementById(`${a.id}change`).innerHTML = change >= 105 ? `<span class="span-alert-closed">${change}%</span>` : change + "%";
+    document.getElementById(`${a.id}changesf`).innerHTML = a.orgprice ? BigNumber(close / a.orgprice * 100).toFixed(2) + "%" : "";
     //check if alert is triggered
     const flag =
       a.condition === 'GE'
@@ -121,6 +230,8 @@ const klineEHandler = ({ symbol, ts, open, high, low, close }) => {
     chartsymbolupd();
   });
 
+  sortTable();
+
   //update chart
   if (!chart.live || chart.symbol !== symbol) return;
   const interval = document.getElementById('interval').value;
@@ -145,6 +256,94 @@ const klineEHandler = ({ symbol, ts, open, high, low, close }) => {
     chart.current = { ...newkline };
     chart.candleSeries.update(chart.current);
   }
+};
+
+let prices = {};
+let usdtsymbols = [];
+let subIndex = 0;
+let intervalObj = null;
+
+const addInitAlerts = async () => {
+  console.log("addInitAlerts => ");
+  // //https://api.binance.com/api/v3/ticker/price
+  // //[{"symbol":"ETHBTC","price":"0.03054800"},{"symbol":"LTCBTC","price":"0.00329000"}, ...]
+  const res1 = await fetch(`https://api.binance.com/api/v3/ticker/price`);
+  const result = await res1.json();
+  // console.log(result);
+
+  result.map(item => {
+    prices[item.symbol] = item.price;
+  });
+
+  usdtsymbols = klinews.symbols.filter(s => {
+    if (s.endsWith("USDT"))
+      return s;
+  });
+  // log(usdtsymbols);
+
+  intervalObj = setInterval(addAlertSchedule, 1200);
+}
+
+const addAlertSchedule = () => {
+
+  log("addAlertSchedule =>");
+
+  const i = subIndex++;
+  const symbol = usdtsymbols[i];
+  addAlert(symbol, "GE", "5%", BigNumber(parseFloat(prices[symbol]) * 1.05).toFixed(8), prices[symbol]);
+
+  if (i === usdtsymbols.length) {
+    clearInterval(intervalObj);
+  }
+}
+
+const addAlert = async (symbol, condition, message, price, orgprice) => {
+
+  if (!klinews.symbols.includes(symbol))
+    return swal('Invalid Symbol!', ' Please enter a valid symbol!', 'error');
+  if (!price)
+    return swal('Invalid Price!', ' Please enter a valid price!', 'error');
+  const alert = {
+    symbol,
+    condition,
+    price,
+    orgprice,
+    message,
+    change: 0,
+    changesf: 0,
+    status: 'PENDING',
+    id: genrandomid(),
+  };
+  alerts = [...alerts, alert];
+  const markup = `<tr id="${alert.id}">
+  <td>${alerts.length}</td>
+  <td>${symbol}</td>
+  <td>${condition}</td>
+  <td>${price}</td>
+  <td id="${alert.id}cp">${price}</td>
+  <td id="${alert.id}change"></td>
+  <td id="${alert.id}changesf"></td>
+  <td id="${alert.id}status"><span class="span-alert-pending">Pending</span></td>
+  <td><i id="${alert.id}delete" class="fas fa-trash-alt btn-delete"></i></td>
+  <td>${message}</td>
+  <td><a target="_blank" href="https://www.binance.com/en/trade/${symbol}?layout=pro">link</a></td>
+  </tr>`;
+  // https://www.binance.com/en/trade/RSRBTC?layout=pro
+  // <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol=BINANCE:${symbol}">link</a></td>
+
+  document.getElementById('alertsbody').insertAdjacentHTML('beforeend', markup);
+  document
+    .getElementById(`${alert.id}delete`)
+    .addEventListener('click', deleteAlertFn);
+  document.getElementById(alert.id).addEventListener('click', chartsymbolupd);
+  document.getElementById(alert.id).style.cursor = 'pointer';
+  klinews.subscribe({ symbol });
+  document.getElementById('symbol').value = '';
+  document.getElementById('condition').value = 'GE';
+  document.getElementById('price').value = '';
+  document.getElementById('message').value = '';
+  if (alert.symbol === chart.symbol) chartsymbolupd();
+
 };
 
 const addAlertBtnFn = () => {
@@ -250,6 +449,6 @@ const deleteClosed = () => {
     document.getElementById(`chart`).innerHTML = '<div id="tvchart"></div>';
   }
 };
-setInterval(deleteClosed, 2 * 60 * 1000);
+// setInterval(deleteClosed, 2 * 60 * 1000);
 
 initialize();
